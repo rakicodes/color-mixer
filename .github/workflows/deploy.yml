@@ -17,6 +17,14 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # Tags error reports with the deployed commit.
+      VITE_RELEASE: ${{ github.sha }}
+      # Enables hidden source maps + upload. If the secret isn't set, the site
+      # still deploys; Sentry stack traces just stay minified.
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      SENTRY_ORG: rakicodes
+      SENTRY_PROJECT: color-mixer
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -26,12 +34,15 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-        env:
-          # Tags error reports with the deployed commit.
-          VITE_RELEASE: ${{ github.sha }}
-          # Uploads source maps to Sentry. If the secret isn't set, the build
-          # still succeeds; stack traces just stay minified.
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      # Inject debug IDs into the built files themselves, then upload those
+      # exact files, so what Sentry has matches what is deployed.
+      - name: Upload source maps to Sentry
+        if: env.SENTRY_AUTH_TOKEN != ''
+        run: |
+          npx sentry-cli sourcemaps inject web/dist
+          npx sentry-cli sourcemaps upload --release "$VITE_RELEASE" web/dist
+      - name: Remove source maps from the published site
+        run: find web/dist -name '*.map' -print -delete
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web/dist

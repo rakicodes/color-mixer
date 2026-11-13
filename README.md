@@ -40,7 +40,7 @@ Errors are reported to Sentry (project `rakicodes/color-mixer`), set up in `web/
 - **Sent:** error message, stack trace, browser, release (git commit), and the current `tab` and `mixModel`.
 - **Never sent:** photos (they stay in a canvas in your browser), user info, or saved paints.
 - **Skipped:** expected guidance such as "tap the paper again" (`CalibrationError`).
-- **Readable stack traces:** in CI, the `SENTRY_AUTH_TOKEN` GitHub secret uploads source maps during the build, and the maps are then deleted from the published site.
+- **Readable stack traces:** in CI, when the `SENTRY_AUTH_TOKEN` GitHub secret is set, `sentry-cli` injects debug IDs into the built files and uploads their source maps. The maps are then deleted from the published site.
 - **Turning it off:** set `VITE_SENTRY_DSN=` (empty) in `web/.env`.
 
 ## Scripts
