@@ -7,12 +7,13 @@ import {
 } from './amounts';
 import { deltaE, hexToOklab, oklabToHex } from './color';
 import { describeDifference } from './describe';
-import { oklabMixModel, type MixModel } from './mix';
+import type { MixModel, MixModelId } from './mix';
+import { getMixModel } from './models';
 import type { Amount, Oklab, Paint, Suggestion } from './types';
-import { dilute } from './water';
 
 export interface SolverOptions {
-  model?: MixModel;
+  /** Mixing model, or its id. Defaults to the simple OKLab blend. */
+  model?: MixModel | MixModelId;
   /** At or below this difference the mix counts as done. */
   doneThreshold?: number;
   /** A suggestion must reduce the difference by at least this much. */
@@ -54,7 +55,7 @@ export function suggestNextStep(
   paints: readonly Paint[],
   options: SolverOptions = {},
 ): Suggestion {
-  const model = options.model ?? oklabMixModel;
+  const model = typeof options.model === 'object' ? options.model : getMixModel(options.model);
   const doneThreshold = options.doneThreshold ?? 3;
   const minImprovement = options.minImprovement ?? 0.5;
   const paintCost = options.paintCost ?? 0.5;
@@ -64,7 +65,7 @@ export function suggestNextStep(
   const currentDeltaE = deltaE(current, target);
   if (currentDeltaE <= doneThreshold) {
     // No difference notes here: they'd contradict "close enough".
-    return { status: 'done', currentDeltaE, water: 'none', notes: [] };
+    return { status: 'done', currentDeltaE, water: 'none', notes: [], modelId: model.id };
   }
   const notes = describeDifference(current, target);
 
@@ -73,22 +74,27 @@ export function suggestNextStep(
     if (!best || c.score < best.score) best = c;
   };
 
+  // Convert everything into the model's space once, then mix and dilute there.
+  const currentEnc = model.encode(current);
+  const evaluate = (mixed: unknown, w: number) => {
+    const predicted = model.decode(w > 0 ? model.dilute(mixed, w) : mixed);
+    return { predicted, dE: deltaE(predicted, target) };
+  };
+
   // Water only.
   for (const w of WATER_STEPS) {
     if (w < MIN_FRACTION) continue;
-    const predicted = dilute(current, w);
-    const dE = deltaE(predicted, target);
+    const { predicted, dE } = evaluate(currentEnc, w);
     consider({ score: dE, dE, paintFraction: 0, waterFraction: w, predicted });
   }
 
   // One paint, optionally with water.
   for (const paint of paints) {
-    const lab = hexToOklab(paint.hex);
+    const paintEnc = model.encode(hexToOklab(paint.hex));
     for (const f of PAINT_STEPS) {
-      const mixed = model.mix(current, lab, f);
+      const mixed = model.mix(currentEnc, paintEnc, f);
       for (const w of WATER_STEPS) {
-        const predicted = dilute(mixed, w);
-        const dE = deltaE(predicted, target);
+        const { predicted, dE } = evaluate(mixed, w);
         consider({ score: dE + paintCost, dE, paint, paintFraction: f, waterFraction: w, predicted });
       }
     }
@@ -102,7 +108,7 @@ export function suggestNextStep(
         ? "Water can't make a wash darker. Add more of your main pigment, or start a stronger puddle."
         : "None of your paints brings this mix closer. You may need a paint you haven't added yet.",
     );
-    return { status: 'stuck', currentDeltaE, water: 'none', notes };
+    return { status: 'stuck', currentDeltaE, water: 'none', notes, modelId: model.id };
   }
 
   return {
@@ -121,5 +127,6 @@ export function suggestNextStep(
     predictedHex: oklabToHex(chosen.predicted),
     predictedDeltaE: chosen.dE,
     notes,
+    modelId: model.id,
   };
 }

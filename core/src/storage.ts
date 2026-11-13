@@ -1,3 +1,5 @@
+import type { MixModelId } from './mix';
+import { DEFAULT_MIX_MODEL, isMixModelId } from './models';
 import type { MixSession, MixStep, Paint } from './types';
 
 /**
@@ -26,6 +28,7 @@ export class MemoryStore implements KeyValueStore {
 
 const PALETTE_KEY = 'color-mixer:palette';
 const SESSION_KEY = 'color-mixer:session';
+const SETTINGS_KEY = 'color-mixer:settings';
 
 /**
  * Reads and validates stored JSON. Corrupt or outdated data falls back
@@ -138,7 +141,39 @@ export class SessionRepo {
     return next;
   }
 
+  /** Replace the most recent step, e.g. after recalculating with another model. */
+  async replaceLastStep(step: MixStep): Promise<MixSession> {
+    const session = await this.load();
+    if (!session?.steps.length) throw new Error('There is no step to update.');
+    const next = { ...session, steps: [...session.steps.slice(0, -1), step] };
+    await this.save(next);
+    return next;
+  }
+
   async clear(): Promise<void> {
     await this.store.remove(SESSION_KEY);
+  }
+}
+
+export interface Settings {
+  mixModel: MixModelId;
+}
+
+export function parseSettings(v: unknown): Settings {
+  const mixModel = isObject(v) && isMixModelId(v.mixModel) ? v.mixModel : DEFAULT_MIX_MODEL;
+  return { mixModel };
+}
+
+export class SettingsRepo {
+  constructor(private store: KeyValueStore) {}
+
+  load(): Promise<Settings> {
+    return readJson(this.store, SETTINGS_KEY, parseSettings);
+  }
+
+  async update(changes: Partial<Settings>): Promise<Settings> {
+    const next = parseSettings({ ...(await this.load()), ...changes });
+    await this.store.set(SETTINGS_KEY, JSON.stringify(next));
+    return next;
   }
 }

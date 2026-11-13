@@ -1,5 +1,5 @@
 import './style.css';
-import { palette, sessions, type AppContext, type Tab } from './app';
+import { palette, sessions, settings, type AppContext, type Tab } from './app';
 import { renderMix } from './views/mix';
 import { renderPalette } from './views/palette';
 import { renderTarget } from './views/target';
@@ -13,7 +13,7 @@ const renderers: Record<Tab, (root: HTMLElement, ctx: AppContext) => Promise<voi
   mix: renderMix,
 };
 
-const ctx: AppContext = { palette, sessions, go };
+const ctx: AppContext = { palette, sessions, settings, go };
 
 function go(tab: Tab) {
   location.hash = tab;

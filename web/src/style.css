@@ -424,3 +424,21 @@ button.icon {
 .toast.error {
   background: var(--danger);
 }
+
+select {
+  font: inherit;
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  background: var(--card);
+  color: var(--text);
+}
+
+.suggestion .badge {
+  align-self: flex-start;
+}
+
+.history .badge {
+  margin-left: 6px;
+}

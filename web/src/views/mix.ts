@@ -1,4 +1,13 @@
-import { formatSuggestion, suggestNextStep, type MixStep, type Suggestion } from '@color-mixer/core';
+import {
+  formatSuggestion,
+  getMixModel,
+  isMixModelId,
+  MIX_MODELS,
+  suggestNextStep,
+  type MixModelId,
+  type MixStep,
+  type Suggestion,
+} from '@color-mixer/core';
 import type { AppContext } from '../app';
 import { h, swatch, withErrors } from '../dom';
 import { pickColorFromPhoto } from '../picker';
@@ -6,7 +15,7 @@ import { pickColorFromPhoto } from '../picker';
 const fmt = (n: number) => n.toFixed(1);
 
 export async function renderMix(root: HTMLElement, ctx: AppContext): Promise<void> {
-  const [session, paints] = await Promise.all([ctx.sessions.load(), ctx.palette.list()]);
+  const [session, paints, settings] = await Promise.all([ctx.sessions.load(), ctx.palette.list(), ctx.settings.load()]);
 
   if (!session) {
     root.append(
@@ -33,10 +42,26 @@ export async function renderMix(root: HTMLElement, ctx: AppContext): Promise<voi
   const check = async () => {
     const picked = await pickColorFromPhoto('Sample your current mix');
     if (!picked) return;
-    const suggestion = suggestNextStep(picked.hex, session.targetHex, paints);
+    const suggestion = suggestNextStep(picked.hex, session.targetHex, paints, { model: settings.mixModel });
     await ctx.sessions.addStep({ measuredHex: picked.hex, calibrated: picked.calibrated, suggestion, ts: Date.now() });
     root.replaceChildren();
     await renderMix(root, ctx);
+  };
+
+  const rerender = async () => {
+    root.replaceChildren();
+    await renderMix(root, ctx);
+  };
+
+  // Switching models recalculates the latest suggestion, so you can compare
+  // models on the same reading without taking a new photo.
+  const onModelChange = async (id: MixModelId) => {
+    await ctx.settings.update({ mixModel: id });
+    if (last) {
+      const suggestion = suggestNextStep(last.measuredHex, session.targetHex, paints, { model: id });
+      await ctx.sessions.replaceLastStep({ ...last, suggestion });
+    }
+    await rerender();
   };
 
   root.append(
@@ -57,6 +82,10 @@ export async function renderMix(root: HTMLElement, ctx: AppContext): Promise<voi
       h('p', { class: 'hint' },
         'For accurate readings, brush a test stroke on the same paper and let it dry (watercolor dries lighter). Photograph it in even light, without glare, with blank paper in view.'),
     ),
+    modelPicker(settings.mixModel, last, withErrors(async (e: Event) => {
+      const id = (e.target as HTMLSelectElement).value;
+      if (isMixModelId(id)) await onModelChange(id);
+    })),
   );
 
   if (session.steps.length) root.append(history(session.steps));
@@ -90,6 +119,7 @@ function suggestionCard(s: Suggestion): HTMLElement {
       : `Difference from target: ${fmt(s.currentDeltaE)}. Under 3 is a match.`;
   return h('div', { class: `suggestion ${s.status}` },
     h('p', { class: 'suggestion-main' }, formatSuggestion(s)),
+    s.modelId ? h('span', { class: 'badge' }, getMixModel(s.modelId).shortLabel) : null,
     s.notes.length ? h('ul', { class: 'notes' }, ...s.notes.map((n) => h('li', {}, n))) : null,
     h('p', { class: 'hint' }, detail),
   );
@@ -107,10 +137,25 @@ function history(steps: MixStep[]): HTMLElement {
               h('strong', {}, `#${i + 1} `),
               formatSuggestion(step.suggestion),
               h('small', { class: 'hint' }, ` ΔE ${fmt(step.suggestion.currentDeltaE)}`),
+              step.suggestion.modelId
+                ? h('span', { class: 'badge' }, getMixModel(step.suggestion.modelId).shortLabel)
+                : null,
             ),
           ),
         )
         .reverse(),
     ),
+  );
+}
+
+function modelPicker(current: MixModelId, last: MixStep | undefined, onchange: (e: Event) => void): HTMLElement {
+  const select = h('select', { class: 'model-select', onchange, 'aria-label': 'Mixing model' },
+    ...Object.values(MIX_MODELS).map((m) => h('option', { value: m.id, selected: m.id === current }, m.label)),
+  );
+  return h('section', { class: 'card' },
+    h('h2', {}, 'Mixing model'),
+    select,
+    h('p', { class: 'hint' }, getMixModel(current).description),
+    last ? h('p', { class: 'hint' }, 'Changing the model recalculates your latest suggestion.') : null,
   );
 }

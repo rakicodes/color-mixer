@@ -1,3 +1,5 @@
+import type { MixModelId } from './mix';
+
 /** sRGB color with channels in 0..1 (gamma-encoded). */
 export interface Rgb {
   r: number;
@@ -55,6 +57,8 @@ export interface Suggestion {
   predictedDeltaE?: number;
   /** Human-readable notes on how the current mix differs from the target. */
   notes: string[];
+  /** Which mixing model produced this suggestion (absent in older saved data). */
+  modelId?: MixModelId;
 }
 
 export interface MixStep {

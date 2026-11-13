@@ -3,6 +3,8 @@ export * from './color';
 export * from './sample';
 export * from './calibrate';
 export * from './mix';
+export * from './models';
+export * from './spectral/convert';
 export * from './water';
 export * from './amounts';
 export * from './describe';
