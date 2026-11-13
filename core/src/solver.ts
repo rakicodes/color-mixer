@@ -62,11 +62,11 @@ export function suggestNextStep(
   const current = hexToOklab(currentHex);
   const target = hexToOklab(targetHex);
   const currentDeltaE = deltaE(current, target);
-  const notes = describeDifference(current, target);
-
   if (currentDeltaE <= doneThreshold) {
-    return { status: 'done', currentDeltaE, water: 'none', notes };
+    // No difference notes here: they'd contradict "close enough".
+    return { status: 'done', currentDeltaE, water: 'none', notes: [] };
   }
+  const notes = describeDifference(current, target);
 
   let best: Candidate | undefined;
   const consider = (c: Candidate) => {

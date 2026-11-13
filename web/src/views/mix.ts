@@ -1,6 +1,6 @@
 import { formatSuggestion, suggestNextStep, type MixStep, type Suggestion } from '@color-mixer/core';
 import type { AppContext } from '../app';
-import { h, swatch } from '../dom';
+import { h, swatch, withErrors } from '../dom';
 import { pickColorFromPhoto } from '../picker';
 
 const fmt = (n: number) => n.toFixed(1);
@@ -20,12 +20,21 @@ export async function renderMix(root: HTMLElement, ctx: AppContext): Promise<voi
   }
 
   const last = session.steps.at(-1);
+  const targetCalibrated = session.targetCalibrated !== false;
+  const mixCalibrated = last?.calibrated !== false;
+  const calibrationWarning =
+    last && targetCalibrated !== mixCalibrated
+      ? h('p', { class: 'error' },
+          mixCalibrated
+            ? 'Your target was picked without white paper but your mix was calibrated, so the comparison may be off.'
+            : 'This mix photo was read without white paper, so the comparison to your target may be off. Include blank paper next time.')
+      : null;
 
   const check = async () => {
     const picked = await pickColorFromPhoto('Sample your current mix');
     if (!picked) return;
     const suggestion = suggestNextStep(picked.hex, session.targetHex, paints);
-    await ctx.sessions.addStep({ measuredHex: picked.hex, suggestion, ts: Date.now() });
+    await ctx.sessions.addStep({ measuredHex: picked.hex, calibrated: picked.calibrated, suggestion, ts: Date.now() });
     root.replaceChildren();
     await renderMix(root, ctx);
   };
@@ -38,11 +47,12 @@ export async function renderMix(root: HTMLElement, ctx: AppContext): Promise<voi
         last?.suggestion.predictedHex ? swatch(last.suggestion.predictedHex, 'After next step') : null,
       ),
       last ? suggestionCard(last.suggestion) : firstStepHelp(),
+      calibrationWarning,
       paints.length
         ? null
         : h('p', { class: 'error' }, 'You have no paints yet, so the app can only suggest water. ',
             h('a', { href: '#paints' }, 'Add paints')),
-      h('button', { class: 'primary big', onclick: check },
+      h('button', { class: 'primary big', onclick: withErrors(check) },
         last ? (last.suggestion.status === 'done' ? 'Check again' : 'I did it: photograph the mix') : 'Photograph your mix'),
       h('p', { class: 'hint' },
         'For accurate readings, brush a test stroke on the same paper and let it dry (watercolor dries lighter). Photograph it in even light, without glare, with blank paper in view.'),
@@ -56,11 +66,11 @@ export async function renderMix(root: HTMLElement, ctx: AppContext): Promise<voi
       h('button', { onclick: () => ctx.go('target') }, 'Change target'),
       h('button', {
         class: 'danger',
-        onclick: async () => {
+        onclick: withErrors(async () => {
           if (!confirm('Clear this mix and its history?')) return;
           await ctx.sessions.clear();
           ctx.go('target');
-        },
+        }),
       }, 'End mix'),
     ),
   );

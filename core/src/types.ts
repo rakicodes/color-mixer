@@ -59,11 +59,18 @@ export interface Suggestion {
 
 export interface MixStep {
   measuredHex: string;
+  /** Whether the measurement was white-balanced against paper. */
+  calibrated?: boolean;
   suggestion: Suggestion;
   ts: number;
 }
 
 export interface MixSession {
   targetHex: string;
+  /**
+   * Whether the target was picked from a paper-calibrated photo.
+   * Hand-entered targets count as calibrated: they already assume white paper.
+   */
+  targetCalibrated?: boolean;
   steps: MixStep[];
 }

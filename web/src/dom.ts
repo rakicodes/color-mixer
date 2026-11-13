@@ -24,6 +24,40 @@ export function h<K extends keyof HTMLElementTagNameMap>(
   return el;
 }
 
+/** Brief message at the bottom of the screen. */
+export function toast(message: string, kind: 'error' | 'info' = 'error'): void {
+  document.querySelector('.toast')?.remove();
+  const el = h('div', { class: `toast ${kind}`, role: 'alert' }, message);
+  document.body.append(el);
+  setTimeout(() => el.remove(), 5000);
+}
+
+/**
+ * Wraps an async event handler so failures show a message instead of
+ * disappearing as unhandled rejections. While it runs, the button that
+ * triggered it (if any) is disabled, so double taps don't repeat the action.
+ */
+export function withErrors<E extends Event>(fn: (e: E) => Promise<unknown> | unknown) {
+  return async (e: E) => {
+    const btn =
+      e.currentTarget instanceof HTMLButtonElement
+        ? e.currentTarget
+        : e.currentTarget instanceof HTMLFormElement
+          ? e.currentTarget.querySelector<HTMLButtonElement>('button[type="submit"]')
+          : null;
+    if (btn?.disabled) return;
+    if (btn) btn.disabled = true;
+    try {
+      await fn(e);
+    } catch (err) {
+      console.error(err);
+      toast(err instanceof Error ? err.message : String(err));
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  };
+}
+
 /** Native color picker plus a hex text box, kept in sync. */
 export function colorField(initial: string, onChange?: (hex: string) => void) {
   const picker = h('input', { type: 'color', value: initial, class: 'color-input' });

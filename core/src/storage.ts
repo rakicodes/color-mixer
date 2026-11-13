@@ -27,14 +27,56 @@ export class MemoryStore implements KeyValueStore {
 const PALETTE_KEY = 'color-mixer:palette';
 const SESSION_KEY = 'color-mixer:session';
 
-async function readJson<T>(store: KeyValueStore, key: string, fallback: T): Promise<T> {
+/**
+ * Reads and validates stored JSON. Corrupt or outdated data falls back
+ * instead of crashing the app.
+ */
+async function readJson<T>(store: KeyValueStore, key: string, validate: (v: unknown) => T): Promise<T> {
   const raw = await store.get(key);
-  if (!raw) return fallback;
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
+  let parsed: unknown = null;
+  if (raw) {
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      parsed = null;
+    }
   }
+  return validate(parsed);
+}
+
+const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null;
+const isHex = (v: unknown): v is string => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v);
+const STATUSES = new Set(['done', 'adjust', 'stuck']);
+
+export function parsePalette(v: unknown): Paint[] {
+  if (!Array.isArray(v)) return [];
+  return v.filter(
+    (p): p is Paint => isObject(p) && typeof p.id === 'string' && typeof p.name === 'string' && isHex(p.hex),
+  ).map((p) => ({ ...p, source: p.source === 'photo' ? 'photo' : 'manual' }));
+}
+
+function isStep(s: unknown): s is MixStep {
+  if (!isObject(s) || !isHex(s.measuredHex) || !isObject(s.suggestion)) return false;
+  const sug = s.suggestion;
+  return (
+    typeof sug.status === 'string' &&
+    STATUSES.has(sug.status) &&
+    typeof sug.currentDeltaE === 'number' &&
+    typeof sug.water === 'string'
+  );
+}
+
+export function parseSession(v: unknown): MixSession | null {
+  if (!isObject(v) || !isHex(v.targetHex)) return null;
+  const steps = Array.isArray(v.steps) ? v.steps.filter(isStep) : [];
+  return {
+    targetHex: v.targetHex,
+    targetCalibrated: v.targetCalibrated !== false,
+    steps: steps.map((s) => ({
+      ...s,
+      suggestion: { ...s.suggestion, notes: Array.isArray(s.suggestion.notes) ? s.suggestion.notes : [] },
+    })),
+  };
 }
 
 /** Short random id. Avoids crypto.randomUUID, which browsers block on plain-http LAN. */
@@ -46,7 +88,7 @@ export class PaletteRepo {
   constructor(private store: KeyValueStore) {}
 
   list(): Promise<Paint[]> {
-    return readJson<Paint[]>(this.store, PALETTE_KEY, []);
+    return readJson(this.store, PALETTE_KEY, parsePalette);
   }
 
   private async save(paints: Paint[]) {
@@ -75,21 +117,22 @@ export class SessionRepo {
   constructor(private store: KeyValueStore) {}
 
   load(): Promise<MixSession | null> {
-    return readJson<MixSession | null>(this.store, SESSION_KEY, null);
+    return readJson(this.store, SESSION_KEY, parseSession);
   }
 
   async save(session: MixSession): Promise<void> {
     await this.store.set(SESSION_KEY, JSON.stringify(session));
   }
 
-  async start(targetHex: string): Promise<MixSession> {
-    const session: MixSession = { targetHex, steps: [] };
+  async start(targetHex: string, targetCalibrated = true): Promise<MixSession> {
+    const session: MixSession = { targetHex, targetCalibrated, steps: [] };
     await this.save(session);
     return session;
   }
 
   async addStep(step: MixStep): Promise<MixSession> {
-    const session = (await this.load()) ?? { targetHex: '#000000', steps: [] };
+    const session = await this.load();
+    if (!session) throw new Error('No mix in progress. Choose a target first.');
     const next = { ...session, steps: [...session.steps, step] };
     await this.save(next);
     return next;

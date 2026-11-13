@@ -12,6 +12,9 @@ import {
   SessionRepo,
   suggestNextStep,
   whiteBalance,
+  CalibrationError,
+  parsePalette,
+  parseSession,
   type Paint,
   type PixelBuffer,
 } from '../src';
@@ -61,7 +64,21 @@ describe('whiteBalance', () => {
   });
 
   it('rejects a paper sample that is too dark', () => {
-    expect(() => whiteBalance(parseHex('#808080'), parseHex('#020202'))).toThrow();
+    expect(() => whiteBalance(parseHex('#101010'), parseHex('#202020'))).toThrow(CalibrationError);
+  });
+
+  it('rejects paint tapped as paper (too colorful)', () => {
+    expect(() => whiteBalance(parseHex('#ffffff'), parseHex('#1f3fa8'))).toThrow(/colorful|dark/);
+    expect(() => whiteBalance(parseHex('#202020'), parseHex('#f4c20d'))).toThrow(/colorful/);
+  });
+
+  it('rejects a color that is brighter than the paper', () => {
+    expect(() => whiteBalance(parseHex('#fafafa'), parseHex('#b0b0b0'))).toThrow(/brighter/);
+  });
+
+  it('accepts paper under warm tungsten light', () => {
+    const paper = parseHex('#ffd4a0');
+    expect(rgbToHex(whiteBalance(paper, paper))).toBe('#ffffff');
   });
 });
 
@@ -69,6 +86,7 @@ describe('suggestNextStep', () => {
   it('reports done when the colors are within the threshold', () => {
     const s = suggestNextStep('#3366cc', '#3467cb', paints);
     expect(s.status).toBe('done');
+    expect(s.notes).toEqual([]);
   });
 
   it.each([0.1, 0.2, 0.3, 0.45])('suggests water only when the target is the mix diluted by %s', (f) => {
@@ -116,6 +134,47 @@ describe('repos', () => {
     const after = await sessions.addStep({ measuredHex: '#aabbcc', suggestion: s, ts: 1 });
     expect(after.steps).toHaveLength(1);
     expect((await sessions.load())?.targetHex).toBe('#336699');
+  });
+});
+
+describe('stored data validation', () => {
+  it('drops invalid paints and keeps valid ones', () => {
+    const paints = parsePalette([
+      { id: 'a', name: 'Ok', hex: '#112233', source: 'photo' },
+      { id: 'b', name: 'Bad hex', hex: 'blue' },
+      null,
+      'junk',
+    ]);
+    expect(paints).toEqual([{ id: 'a', name: 'Ok', hex: '#112233', source: 'photo' }]);
+    expect(parsePalette({ not: 'an array' })).toEqual([]);
+  });
+
+  it('rejects a broken session and repairs missing fields', () => {
+    expect(parseSession(null)).toBeNull();
+    expect(parseSession({ targetHex: 'nope', steps: [] })).toBeNull();
+    const s = parseSession({
+      targetHex: '#336699',
+      steps: [
+        { measuredHex: '#aabbcc', suggestion: { status: 'adjust', currentDeltaE: 5, water: 'some' }, ts: 1 },
+        { measuredHex: '#aabbcc', suggestion: { status: 'weird' } },
+      ],
+    });
+    expect(s?.steps).toHaveLength(1);
+    expect(s?.steps[0].suggestion.notes).toEqual([]);
+    expect(s?.targetCalibrated).toBe(true);
+  });
+
+  it('survives corrupt JSON in storage', async () => {
+    const store = new MemoryStore();
+    store.set('color-mixer:palette', '{not json');
+    store.set('color-mixer:session', '[1,2');
+    expect(await new PaletteRepo(store).list()).toEqual([]);
+    expect(await new SessionRepo(store).load()).toBeNull();
+  });
+
+  it('refuses to add a step with no session', async () => {
+    const s = suggestNextStep('#aabbcc', '#336699', paints);
+    await expect(new SessionRepo(new MemoryStore()).addStep({ measuredHex: '#aabbcc', suggestion: s, ts: 1 })).rejects.toThrow();
   });
 });
 

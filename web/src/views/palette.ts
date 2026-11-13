@@ -1,6 +1,6 @@
 import type { Paint } from '@color-mixer/core';
 import type { AppContext } from '../app';
-import { colorField, h } from '../dom';
+import { colorField, h, withErrors } from '../dom';
 import { pickColorFromPhoto } from '../picker';
 
 export async function renderPalette(root: HTMLElement, ctx: AppContext): Promise<void> {
@@ -41,9 +41,9 @@ export async function renderPalette(root: HTMLElement, ctx: AppContext): Promise
       h('h2', {}, 'Add a paint'),
       h('p', { class: 'hint' },
         'Paint a strong, even swatch of each color on your paper. Then photograph it with some blank paper in view, or enter the color by hand.'),
-      h('form', { class: 'stack', onsubmit: add },
+      h('form', { class: 'stack', onsubmit: withErrors(add) },
         name,
-        h('div', { class: 'row' }, color.el, h('button', { type: 'button', onclick: fromPhoto }, 'From photo…')),
+        h('div', { class: 'row' }, color.el, h('button', { type: 'button', onclick: withErrors(fromPhoto) }, 'From photo…')),
         addError,
         h('button', { type: 'submit', class: 'primary' }, 'Add paint'),
       ),

@@ -1,4 +1,4 @@
-import { rgbToHex, sampleRegion, whiteBalance, type Rgb } from '@color-mixer/core';
+import { checkPaper, rgbToHex, sampleRegion, whiteBalance, type Rgb } from '@color-mixer/core';
 import { loadImageToCanvas, pickImageFile } from './camera';
 import { h } from './dom';
 
@@ -21,7 +21,12 @@ interface Point {
 export async function pickColorFromPhoto(title: string): Promise<PickResult | null> {
   const file = await pickImageFile();
   if (!file) return null;
-  const canvas = await loadImageToCanvas(file);
+  let canvas: HTMLCanvasElement;
+  try {
+    canvas = await loadImageToCanvas(file);
+  } catch {
+    throw new Error("Couldn't open that photo. Try a JPEG or PNG image.");
+  }
   const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
   const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const radius = Math.max(4, Math.round(Math.max(canvas.width, canvas.height) / 160));
@@ -102,6 +107,12 @@ export async function pickColorFromPhoto(title: string): Promise<PickResult | nu
       const rgb = sampleRegion(pixels, pt.x, pt.y, radius);
       error.textContent = '';
       if (step === 'paper') {
+        try {
+          checkPaper(rgb);
+        } catch (err) {
+          error.textContent = err instanceof Error ? err.message : String(err);
+          return;
+        }
         paperPt = pt;
         paper = rgb;
         setStep('color');
@@ -118,17 +129,24 @@ export async function pickColorFromPhoto(title: string): Promise<PickResult | nu
         setStep('color');
       } catch (err) {
         error.textContent = err instanceof Error ? err.message : String(err);
-        paperPt = paper = null;
+        paperPt = paper = colorPt = result = null;
         setStep('paper');
       }
     }
 
+    // Phone back button or a tab change: close instead of leaving the overlay stuck.
+    const onNavigate = () => close(null);
+
     function close(value: PickResult | null) {
+      window.removeEventListener('hashchange', onNavigate);
+      window.removeEventListener('popstate', onNavigate);
       overlay.remove();
       document.body.classList.remove('no-scroll');
       resolve(value);
     }
 
+    window.addEventListener('hashchange', onNavigate);
+    window.addEventListener('popstate', onNavigate);
     canvas.addEventListener('pointerup', onTap);
     document.body.append(overlay);
     document.body.classList.add('no-scroll');
