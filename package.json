@@ -1,0 +1,11 @@
+{
+  "name": "color-mixer",
+  "private": true,
+  "workspaces": ["core", "web"],
+  "scripts": {
+    "dev": "npm run dev -w web",
+    "build": "npm run build -w web",
+    "test": "npm test -w core",
+    "typecheck": "tsc -p core --noEmit && tsc -p web --noEmit"
+  }
+}
