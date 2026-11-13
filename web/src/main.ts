@@ -4,6 +4,7 @@ import { renderMix } from './views/mix';
 import { renderPalette } from './views/palette';
 import { renderTarget } from './views/target';
 import { toast } from './dom';
+import { initThemeToggle } from './theme';
 
 const view = document.getElementById('view')!;
 const tabs = document.getElementById('tabs')!;
@@ -49,6 +50,8 @@ tabs.addEventListener('click', (e) => {
   if (tab) go(tab);
 });
 window.addEventListener('hashchange', render);
+
+void initThemeToggle(settings);
 
 // Start on the Mix tab when there is a session in progress.
 (async () => {

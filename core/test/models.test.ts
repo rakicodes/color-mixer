@@ -134,6 +134,20 @@ describe('settings', () => {
     expect((await repo.load()).mixModel).toBe('bl-spectral');
   });
 
+  it('theme defaults to system, persists, and keeps the model choice', async () => {
+    const repo = new SettingsRepo(new MemoryStore());
+    expect((await repo.load()).theme).toBe('system');
+    await repo.update({ mixModel: 'bl-rgb' });
+    await repo.update({ theme: 'dark' });
+    expect(await repo.load()).toEqual({ mixModel: 'bl-rgb', theme: 'dark' });
+  });
+
+  it('falls back to system for an unknown theme', async () => {
+    const store = new MemoryStore();
+    store.set('color-mixer:settings', JSON.stringify({ mixModel: 'km-spectral', theme: 'neon' }));
+    expect(await new SettingsRepo(store).load()).toEqual({ mixModel: 'km-spectral', theme: 'system' });
+  });
+
   it('falls back to the default for unknown or corrupt values', async () => {
     const store = new MemoryStore();
     store.set('color-mixer:settings', JSON.stringify({ mixModel: 'nope' }));

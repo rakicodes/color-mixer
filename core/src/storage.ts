@@ -155,13 +155,23 @@ export class SessionRepo {
   }
 }
 
+/** 'system' follows the device's light/dark preference. */
+export type Theme = 'system' | 'light' | 'dark';
+export const THEMES: readonly Theme[] = ['system', 'light', 'dark'];
+
 export interface Settings {
   mixModel: MixModelId;
+  theme: Theme;
 }
 
+const isTheme = (v: unknown): v is Theme => typeof v === 'string' && (THEMES as readonly string[]).includes(v);
+
 export function parseSettings(v: unknown): Settings {
-  const mixModel = isObject(v) && isMixModelId(v.mixModel) ? v.mixModel : DEFAULT_MIX_MODEL;
-  return { mixModel };
+  const obj = isObject(v) ? v : {};
+  return {
+    mixModel: isMixModelId(obj.mixModel) ? obj.mixModel : DEFAULT_MIX_MODEL,
+    theme: isTheme(obj.theme) ? obj.theme : 'system',
+  };
 }
 
 export class SettingsRepo {
