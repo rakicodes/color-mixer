@@ -33,6 +33,16 @@ The spectral models estimate a spectrum from each RGB reading (the spectral.js m
   - `storage.ts`: `KeyValueStore` interface plus palette, session and settings repos (async, so AsyncStorage works too)
 - `web/`: Vite + TypeScript UI, canvas picker, localStorage.
 
+## Error reporting
+
+Errors are reported to Sentry (project `rakicodes/color-mixer`), set up in `web/src/errors.ts`.
+
+- **Sent:** error message, stack trace, browser, release (git commit), and the current `tab` and `mixModel`.
+- **Never sent:** photos (they stay in a canvas in your browser), user info, or saved paints.
+- **Skipped:** expected guidance such as "tap the paper again" (`CalibrationError`).
+- **Readable stack traces:** in CI, the `SENTRY_AUTH_TOKEN` GitHub secret uploads source maps during the build, and the maps are then deleted from the published site.
+- **Turning it off:** set `VITE_SENTRY_DSN=` (empty) in `web/.env`.
+
 ## Scripts
 
 ```sh

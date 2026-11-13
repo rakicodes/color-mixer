@@ -1,3 +1,5 @@
+import { reportError } from './errors';
+
 type Child = Node | string | number | null | undefined | false;
 type Props = Record<string, unknown> & { class?: string };
 
@@ -51,6 +53,7 @@ export function withErrors<E extends Event>(fn: (e: E) => Promise<unknown> | unk
       await fn(e);
     } catch (err) {
       console.error(err);
+      reportError(err);
       toast(err instanceof Error ? err.message : String(err));
     } finally {
       if (btn) btn.disabled = false;

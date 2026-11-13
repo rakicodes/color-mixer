@@ -26,6 +26,12 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+        env:
+          # Tags error reports with the deployed commit.
+          VITE_RELEASE: ${{ github.sha }}
+          # Uploads source maps to Sentry. If the secret isn't set, the build
+          # still succeeds; stack traces just stay minified.
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web/dist

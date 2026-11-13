@@ -9,9 +9,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@color-mixer/core": "*"
+    "@color-mixer/core": "*",
+    "@sentry/browser": "^11.12.0"
   },
   "devDependencies": {
+    "@sentry/bundler-plugins": "^11.12.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.7"
   }

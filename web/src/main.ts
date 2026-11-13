@@ -1,3 +1,6 @@
+import { initErrorReporting, reportError, setErrorContext } from './errors';
+initErrorReporting(); // as early as possible
+
 import './style.css';
 import { palette, sessions, settings, type AppContext, type Tab } from './app';
 import { renderMix } from './views/mix';
@@ -31,12 +34,14 @@ async function render() {
   }
   // Build into a detached container and only show it if no newer render has
   // started meanwhile. Matters once storage is truly async (e.g. a phone app).
+  setErrorContext('tab', current);
   const container = document.createElement('div');
   container.className = 'view-content';
   try {
     await renderers[current](container, ctx);
   } catch (err) {
     console.error(err);
+    reportError(err, { tab: current });
     if (id === renderId) toast("Something went wrong showing this page. Try reloading.");
     return;
   }
@@ -52,6 +57,7 @@ tabs.addEventListener('click', (e) => {
 window.addEventListener('hashchange', render);
 
 void initThemeToggle(settings);
+void settings.load().then((s) => setErrorContext('mixModel', s.mixModel));
 
 // Start on the Mix tab when there is a session in progress.
 (async () => {

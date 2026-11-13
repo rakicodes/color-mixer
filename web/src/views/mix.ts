@@ -10,6 +10,7 @@ import {
 } from '@color-mixer/core';
 import type { AppContext } from '../app';
 import { h, swatch, withErrors } from '../dom';
+import { setErrorContext } from '../errors';
 import { pickColorFromPhoto } from '../picker';
 
 const fmt = (n: number) => n.toFixed(1);
@@ -57,6 +58,7 @@ export async function renderMix(root: HTMLElement, ctx: AppContext): Promise<voi
   // models on the same reading without taking a new photo.
   const onModelChange = async (id: MixModelId) => {
     await ctx.settings.update({ mixModel: id });
+    setErrorContext('mixModel', id);
     if (last) {
       const suggestion = suggestNextStep(last.measuredHex, session.targetHex, paints, { model: id });
       await ctx.sessions.replaceLastStep({ ...last, suggestion });
