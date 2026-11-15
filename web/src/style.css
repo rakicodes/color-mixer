@@ -257,6 +257,11 @@ button.danger {
   flex-wrap: wrap;
 }
 
+/* Rename errors wrap onto their own line under the paint. */
+.paint-item .error {
+  flex-basis: 100%;
+}
+
 .paint-item .hex-input {
   display: none;
 }

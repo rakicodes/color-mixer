@@ -87,6 +87,18 @@ export function createId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
+/** Thrown when a paint name is already used (compared case-insensitively, trimmed). */
+export class DuplicatePaintError extends Error {
+  override name = 'DuplicatePaintError';
+}
+
+const nameKey = (name: string) => name.trim().toLowerCase();
+
+function assertUniqueName(paints: Paint[], name: string, exceptId?: string): void {
+  const existing = paints.find((p) => p.id !== exceptId && nameKey(p.name) === nameKey(name));
+  if (existing) throw new DuplicatePaintError(`You already have a paint named ${existing.name}.`);
+}
+
 export class PaletteRepo {
   constructor(private store: KeyValueStore) {}
 
@@ -100,6 +112,7 @@ export class PaletteRepo {
 
   async add(paint: Omit<Paint, 'id'>): Promise<Paint> {
     const paints = await this.list();
+    assertUniqueName(paints, paint.name);
     const created = { ...paint, id: createId() };
     await this.save([...paints, created]);
     return created;
@@ -107,6 +120,9 @@ export class PaletteRepo {
 
   async update(paint: Paint): Promise<void> {
     const paints = await this.list();
+    // Only check when the name changes, so duplicates saved before this rule can still be edited.
+    const before = paints.find((p) => p.id === paint.id);
+    if (!before || nameKey(before.name) !== nameKey(paint.name)) assertUniqueName(paints, paint.name, paint.id);
     await this.save(paints.map((p) => (p.id === paint.id ? paint : p)));
   }
 
