@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeDifference, formatSuggestion, hexToOklab, hueName, type Oklab, type Suggestion } from '../src';
+import { describeDifference, formatSuggestion, hexToOklab, hueName, suggestionPaints, type Oklab, type Suggestion } from '../src';
 
 const base: Suggestion = { status: 'adjust', currentDeltaE: 10, water: 'none', notes: [] };
 const paint = (amount: 'touch' | 'some' | 'lot') => ({ id: 'ub', name: 'Ultramarine', amount, fraction: 0.1 });
@@ -28,6 +28,24 @@ describe('MIX-04: formatSuggestion', () => {
     expect(formatSuggestion({ ...base, paint: paint('touch'), water: 'some' })).toBe(
       'Add a touch of Ultramarine and some water.',
     );
+  });
+
+  it('MIX-04: several paints in one step, with and without water', () => {
+    const rose = { id: 'qr', name: 'Quinacridone Rose', amount: 'some' as const, fraction: 0.2 };
+    const yellow = { id: 'hy', name: 'Hansa Yellow', amount: 'touch' as const, fraction: 0.03 };
+    const two = { ...base, paint: rose, paints: [rose, paint('touch')] };
+    expect(formatSuggestion(two)).toBe('Add some Quinacridone Rose and a touch of Ultramarine.');
+    expect(formatSuggestion({ ...two, water: 'lot' })).toBe(
+      'Add some Quinacridone Rose, a touch of Ultramarine and a lot of water.',
+    );
+    expect(formatSuggestion({ ...base, paint: rose, paints: [rose, paint('touch'), yellow], water: 'some' })).toBe(
+      'Add some Quinacridone Rose, a touch of Ultramarine, a touch of Hansa Yellow and some water.',
+    );
+  });
+
+  it('MIX-04: older suggestions with only `paint` still format', () => {
+    expect(suggestionPaints({ ...base, paint: paint('lot') })).toEqual([paint('lot')]);
+    expect(suggestionPaints(base)).toEqual([]);
   });
 });
 

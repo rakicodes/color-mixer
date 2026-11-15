@@ -3,9 +3,12 @@ import {
   getMixModel,
   isMixModelId,
   MIX_MODELS,
-  suggestNextStep,
+  formatStartingMix,
+  nextStepFromRecipe,
+  planFromScratch,
   type MixModelId,
   type MixStep,
+  type Paint,
   type Suggestion,
 } from '@color-mixer/core';
 import type { AppContext } from '../app';
@@ -44,7 +47,7 @@ export async function renderMix(root: HTMLElement, ctx: AppContext): Promise<voi
   const check = async () => {
     const picked = await pickColorFromPhoto('Sample your current mix');
     if (!picked) return;
-    const suggestion = suggestNextStep(picked.hex, session.targetHex, paints, { model: settings.mixModel });
+    const { suggestion } = nextStepFromRecipe(picked.hex, session.targetHex, paints, { model: settings.mixModel });
     await ctx.sessions.addStep({ measuredHex: picked.hex, calibrated: picked.calibrated, suggestion, ts: Date.now() });
     root.replaceChildren();
     await renderMix(root, ctx);
@@ -61,7 +64,7 @@ export async function renderMix(root: HTMLElement, ctx: AppContext): Promise<voi
     await ctx.settings.update({ mixModel: id });
     setErrorContext('mixModel', id);
     if (last) {
-      const suggestion = suggestNextStep(last.measuredHex, session.targetHex, paints, { model: id });
+      const { suggestion } = nextStepFromRecipe(last.measuredHex, session.targetHex, paints, { model: id });
       await ctx.sessions.replaceLastStep({ ...last, suggestion });
     }
     await rerender();
@@ -75,6 +78,7 @@ export async function renderMix(root: HTMLElement, ctx: AppContext): Promise<voi
         last?.suggestion.predictedHex ? swatch(last.suggestion.predictedHex, 'After next step') : null,
       ),
       last ? suggestionCard(last.suggestion) : firstStepHelp(),
+      last ? null : startingMix(session.targetHex, paints, settings.mixModel),
       calibrationWarning,
       paints.length
         ? null
@@ -112,6 +116,22 @@ function firstStepHelp(): HTMLElement {
   return h('div', { class: 'suggestion' },
     h('p', { class: 'suggestion-main' }, 'Mix a starting puddle, then photograph a test stroke.'),
     h('p', { class: 'hint' }, 'The app will tell you which of your paints to add next, and how much water.'),
+  );
+}
+
+/** Before the first photo: which paints to start the puddle with. */
+function startingMix(targetHex: string, paints: Paint[], model: MixModelId): HTMLElement | null {
+  if (!paints.length) return null;
+  const recipe = planFromScratch(targetHex, paints, { model });
+  const detail = recipe.outcome === 'done'
+    ? `Predicted difference from target: about ${fmt(recipe.predictedDeltaE)}.`
+    : `This is the closest your paints get: about ${fmt(recipe.predictedDeltaE)} from the target.`;
+  return h('div', { class: 'starting-mix' },
+    h('span', { class: 'chip sm', style: { background: recipe.predictedHex }, title: recipe.predictedHex }),
+    h('div', {},
+      h('p', { class: 'starting-mix-main' }, `Starting mix: ${formatStartingMix(recipe)}`),
+      h('p', { class: 'hint' }, detail),
+    ),
   );
 }
 

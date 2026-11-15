@@ -51,6 +51,21 @@ test('MIX-02 → MIX-13: full mixing loop down to "Close enough"', async ({ page
   await expect(history).toHaveCount(2);
 });
 
+test('REC-01 / REC-03: starting mix before the first photo, then all paints in one step', async ({ page }) => {
+  // From plain paper to a violet takes both paints.
+  await seed(page, { paints: PAINTS, session: { targetHex: '#a179a9' } }, '#mix');
+  await expect(page.locator('.starting-mix-main')).toHaveText(/^Starting mix: .+, as a (strong|medium|pale) wash/);
+
+  await photographMix(page, '#ffffff');
+  await expect(page.locator('.starting-mix')).toHaveCount(0);
+  await expect(suggestion(page)).toContainText('Ultramarine');
+  await expect(suggestion(page)).toContainText('Quinacridone Rose');
+  await expect(suggestion(page)).toHaveText(/^Add .+\.$/);
+  await expect(page.locator('.recipe')).toHaveCount(0);
+  const session = await stored(page, 'session');
+  expect(session.steps[0].suggestion.paints).toHaveLength(2);
+});
+
 test('MIX-08: stuck when nothing can get closer', async ({ page }) => {
   await seed(page, { paints: [{ name: 'Burnt Sienna', hex: '#8a3b1e' }], session: { targetHex: '#00aa44' } }, '#mix');
   // Same case as the core solver test: sienna can't turn white into green.

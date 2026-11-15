@@ -37,18 +37,26 @@ export interface Paint {
 
 export type SuggestionStatus = 'done' | 'adjust' | 'stuck';
 
+/** One paint to add in a step. */
+export interface SuggestionPaint {
+  id: string;
+  name: string;
+  amount: Exclude<Amount, 'none'>;
+  /** Share of the resulting mix from this paint, as found by the solver. */
+  fraction: number;
+}
+
 export interface Suggestion {
   status: SuggestionStatus;
   /** CIEDE2000 difference between the measured current mix and the target. */
   currentDeltaE: number;
-  /** Paint to add (absent when only water is suggested, or when done/stuck). */
-  paint?: {
-    id: string;
-    name: string;
-    amount: Exclude<Amount, 'none'>;
-    /** Share of the resulting mix from this paint, as found by the solver. */
-    fraction: number;
-  };
+  /**
+   * Paint to add (absent when only water is suggested, or when done/stuck).
+   * With several paints, this is the largest one; see `paints`.
+   */
+  paint?: SuggestionPaint;
+  /** All paints to add together in this step, largest first (absent in one-paint and older suggestions). */
+  paints?: SuggestionPaint[];
   water: Amount;
   /** How far the solver moved the wash toward paper white (0..1). */
   waterFraction?: number;
