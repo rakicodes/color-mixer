@@ -360,10 +360,19 @@ button.danger {
   gap: 10px;
 }
 
-.history li {
+.history li,
+.starting-mix {
   display: flex;
   gap: 10px;
   align-items: center;
+}
+
+.starting-mix p {
+  margin: 0;
+}
+
+.starting-mix-main {
+  font-weight: 600;
 }
 
 /* Photo picker overlay */

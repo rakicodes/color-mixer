@@ -1,15 +1,27 @@
 import { AMOUNT_LABELS } from './amounts';
 import { toOklch } from './color';
-import type { Oklab, Suggestion } from './types';
+import type { Oklab, Suggestion, SuggestionPaint } from './types';
 
-/** One-line instruction for a suggestion, e.g. "Add a touch of Ultramarine and some water." */
+/** Every paint in a suggestion, largest first. Older suggestions only have `paint`. */
+export function suggestionPaints(s: Suggestion): SuggestionPaint[] {
+  return s.paints ?? (s.paint ? [s.paint] : []);
+}
+
+/** "a", "a and b", "a, b and c" */
+export function listOf(items: string[]): string {
+  return items.length <= 2 ? items.join(' and ') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`;
+}
+
+/**
+ * One-line instruction for a suggestion, e.g. "Add a touch of Ultramarine and
+ * some water." or "Add some Rose, a touch of Ultramarine and some water."
+ */
 export function formatSuggestion(s: Suggestion): string {
   if (s.status === 'done') return 'Close enough. This matches your target!';
   if (s.status === 'stuck') return "Your paints can't get this mix any closer.";
-  const water = s.water === 'none' ? '' : `${AMOUNT_LABELS[s.water]} water`;
-  if (!s.paint) return `Add ${water}.`;
-  const paint = `${AMOUNT_LABELS[s.paint.amount]} ${s.paint.name}`;
-  return water ? `Add ${paint} and ${water}.` : `Add ${paint}.`;
+  const items = suggestionPaints(s).map((p) => `${AMOUNT_LABELS[p.amount]} ${p.name}`);
+  if (s.water !== 'none') items.push(`${AMOUNT_LABELS[s.water]} water`);
+  return `Add ${listOf(items)}.`;
 }
 
 const HUE_ANCHORS: [number, string][] = [

@@ -1,4 +1,4 @@
-import { MIX_MODELS, type MixModelId } from '@color-mixer/core';
+import { formatSuggestion, MIX_MODELS, planFromCurrent, type MixModelId, type Paint } from '@color-mixer/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../src/picker', () => ({ pickColorFromPhoto: vi.fn() }));
@@ -262,5 +262,66 @@ describe('MOD-01 / MOD-02: mixing model picker', () => {
     expect(steps[0].measuredHex).toBe('#111111');
     expect(steps[1]).toMatchObject({ measuredHex: '#8fa3e0', ts: 42, calibrated: false, suggestion: { modelId: 'bl-spectral' } });
     expect(root.querySelector('.suggestion .badge')?.textContent).toBe('Glaze spectral');
+  });
+});
+
+describe('REC-03: starting mix before the first photo', () => {
+  it('REC-03: suggests a starting mix from your paints, as parts and a wash', async () => {
+    const { root, swatches } = await setup(started());
+    const main = root.querySelector('.starting-mix-main')?.textContent ?? '';
+    expect(main).toMatch(/^Starting mix: .*(Ultramarine|Quinacridone Rose).*, as a (strong|medium|pale) wash/);
+    expect(root.querySelector('.starting-mix .chip')).not.toBeNull();
+    expect(text(root)).toMatch(/difference from target: about \d+\.\d|closest your paints get/);
+    // Still the first-step help, and no extra swatch.
+    expect(text(root)).toContain('Mix a starting puddle, then photograph a test stroke.');
+    expect(swatches()).toEqual(['Target']);
+  });
+
+  it('REC-03: not shown without paints, or once there is a reading', async () => {
+    expect((await setup(started(), false)).root.querySelector('.starting-mix')).toBeNull();
+    expect((await setup(withStep())).root.querySelector('.starting-mix')).toBeNull();
+  });
+});
+
+describe('REC-01 / REC-02: next step from the recipe', () => {
+  // From plain paper to a violet needs both paints.
+  const WHITE = '#ffffff';
+  const VIOLET = '#a179a9';
+  const savedPaints = async (ctx: Ctx) => (await ctx.palette.list()) as Paint[];
+
+  it('REC-01: after a photo, one step adds every paint the recipe needs', async () => {
+    picker.mockResolvedValue({ hex: WHITE, calibrated: true });
+    const { ctx, root } = await setup(started(VIOLET));
+    buttonByText(root, 'Photograph your mix').click();
+    await flush(20);
+    const [expected] = planFromCurrent(WHITE, VIOLET, await savedPaints(ctx)).steps;
+    const saved = (await ctx.sessions.load())!.steps[0].suggestion;
+    expect(saved).toEqual(expected);
+    expect(saved.paints?.map((p) => p.name).sort()).toEqual(['Quinacridone Rose', 'Ultramarine']);
+    const main = root.querySelector('.suggestion-main')?.textContent ?? '';
+    expect(main).toBe(formatSuggestion(expected));
+    expect(main).toContain('Ultramarine');
+    expect(main).toContain('Quinacridone Rose');
+    expect(root.querySelector('.history li')?.textContent).toContain(main);
+  });
+
+  it('REC-01: there is no separate recipe card', async () => {
+    const { root } = await setup(withStep(step(WHITE), VIOLET));
+    expect(text(root)).not.toContain('Full recipe');
+    expect(root.querySelector('.recipe')).toBeNull();
+  });
+
+  it('REC-02: switching the model recomputes the step', async () => {
+    picker.mockResolvedValue({ hex: WHITE, calibrated: true });
+    const { ctx, root } = await setup(started(VIOLET));
+    buttonByText(root, 'Photograph your mix').click();
+    await flush(20);
+    const select = root.querySelector<HTMLSelectElement>('select.model-select')!;
+    select.value = 'km-spectral';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    await flush(20);
+    const [km] = planFromCurrent(WHITE, VIOLET, await savedPaints(ctx), { model: 'km-spectral' }).steps;
+    expect((await ctx.sessions.load())!.steps[0].suggestion).toEqual(km);
+    expect(root.querySelector('.suggestion-main')?.textContent).toBe(formatSuggestion(km));
   });
 });

@@ -9,4 +9,5 @@ export * from './water';
 export * from './amounts';
 export * from './describe';
 export * from './solver';
+export * from './recipe';
 export * from './storage';
