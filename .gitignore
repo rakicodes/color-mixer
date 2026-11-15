@@ -1,6 +1,16 @@
 node_modules
 dist
 
+# Playwright output
+test-results
+playwright-report
+
+# Requirements workbook (kept local)
+docs/
+
+# Office lock files (e.g. ~$requirements.xlsx while open in Excel)
+~$*
+
 # secrets (never commit)
 .env.local
 .env.*.local

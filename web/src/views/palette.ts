@@ -1,4 +1,4 @@
-import type { Paint } from '@color-mixer/core';
+import { DuplicatePaintError, type Paint } from '@color-mixer/core';
 import type { AppContext } from '../app';
 import { colorField, h, withErrors } from '../dom';
 import { pickColorFromPhoto } from '../picker';
@@ -32,7 +32,14 @@ export async function renderPalette(root: HTMLElement, ctx: AppContext): Promise
       name.focus();
       return;
     }
-    await ctx.palette.add({ name: name.value.trim(), hex: color.value, source });
+    try {
+      await ctx.palette.add({ name: name.value.trim(), hex: color.value, source });
+    } catch (err) {
+      if (!(err instanceof DuplicatePaintError)) throw err;
+      addError.textContent = err.message;
+      name.focus();
+      return;
+    }
     await rerender();
   };
 
@@ -54,21 +61,46 @@ export async function renderPalette(root: HTMLElement, ctx: AppContext): Promise
   const list = h('ul', { class: 'paint-list' });
   for (const paint of paints) {
     let current = paint; // kept up to date so name and color edits don't overwrite each other
-    const save = (changes: Partial<Paint>) => {
+    const save = async (changes: Partial<Paint>) => {
+      const previous = current;
       current = { ...current, ...changes };
-      return ctx.palette.update(current);
+      try {
+        await ctx.palette.update(current);
+      } catch (err) {
+        current = previous;
+        throw err;
+      }
     };
+    const rowError = h('p', { class: 'error' });
+    // A rejected name stays in the field so it can be corrected; storage keeps the old name.
     const rename = h('input', {
       type: 'text',
       value: paint.name,
       class: 'grow inline-edit',
       'aria-label': 'Paint name',
-      onchange: () => rename.value.trim() && save({ name: rename.value.trim() }),
+      onchange: withErrors(async () => {
+        const next = rename.value.trim();
+        if (!next) {
+          rowError.textContent = 'Give the paint a name.';
+          return;
+        }
+        try {
+          await save({ name: next });
+        } catch (err) {
+          if (!(err instanceof DuplicatePaintError)) throw err;
+          rowError.textContent = err.message;
+          return;
+        }
+        rowError.textContent = '';
+      }),
     });
     const editColor = colorField(paint.hex);
-    editColor.el.addEventListener('change', () => {
-      if (editColor.value !== current.hex) save({ hex: editColor.value, source: 'manual' });
-    });
+    editColor.el.addEventListener(
+      'change',
+      withErrors(async () => {
+        if (editColor.value !== current.hex) await save({ hex: editColor.value, source: 'manual' });
+      }),
+    );
     list.append(
       h('li', { class: 'paint-item' },
         editColor.el,
@@ -78,13 +110,14 @@ export async function renderPalette(root: HTMLElement, ctx: AppContext): Promise
           class: 'danger icon',
           'aria-label': `Delete ${current.name}`,
           title: 'Delete',
-          onclick: async () => {
+          onclick: withErrors(async () => {
             if (confirm(`Delete ${current.name}?`)) {
               await ctx.palette.remove(paint.id);
               await rerender();
             }
-          },
+          }),
         }, '✕'),
+        rowError,
       ),
     );
   }

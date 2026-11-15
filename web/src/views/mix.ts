@@ -32,13 +32,14 @@ export async function renderMix(root: HTMLElement, ctx: AppContext): Promise<voi
   const last = session.steps.at(-1);
   const targetCalibrated = session.targetCalibrated !== false;
   const mixCalibrated = last?.calibrated !== false;
-  const calibrationWarning =
-    last && targetCalibrated !== mixCalibrated
-      ? h('p', { class: 'error' },
-          mixCalibrated
-            ? 'Your target was picked without white paper but your mix was calibrated, so the comparison may be off.'
-            : 'This mix photo was read without white paper, so the comparison to your target may be off. Include blank paper next time.')
-      : null;
+  const calibrationText = !last || (targetCalibrated && mixCalibrated)
+    ? null
+    : !targetCalibrated && !mixCalibrated
+      ? 'Neither your target nor this mix was read with white paper, so colors may be off. Include blank paper in your photos.'
+      : mixCalibrated
+        ? 'Your target was picked without white paper but your mix was calibrated, so the comparison may be off.'
+        : 'This mix photo was read without white paper, so the comparison to your target may be off. Include blank paper next time.';
+  const calibrationWarning = calibrationText ? h('p', { class: 'error' }, calibrationText) : null;
 
   const check = async () => {
     const picked = await pickColorFromPhoto('Sample your current mix');
