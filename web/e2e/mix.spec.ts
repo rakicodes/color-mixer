@@ -20,7 +20,7 @@ test('MIX-01: with no mix in progress, points to the Target tab', async ({ page 
 
 test('MIX-02 → MIX-13: full mixing loop down to "Close enough"', async ({ page }) => {
   await seed(page, { paints: PAINTS, session: { targetHex: TARGET } }, '#mix');
-  await expect(suggestion(page)).toHaveText('Mix a starting puddle, then photograph a test stroke.');
+  await expect(suggestion(page)).toHaveText(/^Take a picture of your colour, or use .+ to create it\.$/);
   await expect(mainButton(page)).toHaveText('Photograph your mix');
 
   // Reading 1: a pale blue; the target is a pale violet, so the rose should help.
@@ -28,9 +28,7 @@ test('MIX-02 → MIX-13: full mixing loop down to "Close enough"', async ({ page
   await expect(suggestion(page)).toContainText('Quinacridone Rose');
   await expect(suggestion(page)).toHaveText(/^Add .+\.$/);
   await expect(page.locator('.swatch figcaption')).toHaveText(['Target' + TARGET, 'Your mix' + MIX, /^After next step#[0-9a-f]{6}$/]);
-  await expect(page.locator('.suggestion .hint')).toHaveText(
-    /^Difference from target: \d+\.\d, about \d+\.\d after this step\. Under 3 is a match\.$/,
-  );
+  await expect(page.locator('.suggestion .hint')).toHaveCount(0);
   await expect(mainButton(page)).toHaveText('I did it: photograph the mix');
 
   // Reading 2: now it matches.
@@ -54,7 +52,7 @@ test('MIX-02 → MIX-13: full mixing loop down to "Close enough"', async ({ page
 test('REC-01 / REC-03: starting mix before the first photo, then all paints in one step', async ({ page }) => {
   // From plain paper to a violet takes both paints.
   await seed(page, { paints: PAINTS, session: { targetHex: '#a179a9' } }, '#mix');
-  await expect(page.locator('.starting-mix-main')).toHaveText(/^Starting mix: .+, as a (strong|medium|pale) wash/);
+  await expect(page.locator('.starting-mix-main')).toHaveText(/^Mix .+, as a (strong|medium|pale) wash/);
 
   await photographMix(page, '#ffffff');
   await expect(page.locator('.starting-mix')).toHaveCount(0);
@@ -71,7 +69,8 @@ test('MIX-08: stuck when nothing can get closer', async ({ page }) => {
   // Same case as the core solver test: sienna can't turn white into green.
   await photographMix(page, '#ffffff');
   await expect(suggestion(page)).toHaveText("Your paints can't get this mix any closer.");
-  await expect(page.locator('.suggestion.stuck .notes')).toBeVisible();
+  await expect(page.locator('.suggestion.stuck')).toBeVisible();
+  await expect(page.locator('.notes')).toHaveCount(0);
 });
 
 test('MIX-11: with no paints, warns and links to Paints', async ({ page }) => {

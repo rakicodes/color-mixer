@@ -8,8 +8,8 @@ const barColor = (page: import('@playwright/test').Page) =>
 const pageBg = (page: import('@playwright/test').Page) =>
   page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor);
 
-const LIGHT_BG = 'rgb(246, 244, 239)';
-const DARK_BG = 'rgb(21, 23, 27)';
+const LIGHT_BG = 'rgb(251, 245, 238)';
+const DARK_BG = 'rgb(36, 23, 25)';
 
 test('THM-01: cycles System → Light → Dark and remembers the choice', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'light' });
@@ -60,9 +60,9 @@ test('THM-03: System follows the device, including live changes', async ({ page 
   await page.emulateMedia({ colorScheme: 'dark' });
   await seed(page, {}, '#paints');
   expect(await pageBg(page)).toBe(DARK_BG);
-  expect(await barColor(page)).toBe('#15171b');
+  expect(await barColor(page)).toBe('#241719');
   await page.emulateMedia({ colorScheme: 'light' });
-  await expect.poll(() => barColor(page)).toBe('#f6f4ef');
+  await expect.poll(() => barColor(page)).toBe('#fbf5ee');
   expect(await pageBg(page)).toBe(LIGHT_BG);
 });
 
@@ -70,5 +70,5 @@ test('THM-03: an explicit Light choice ignores a dark device', async ({ page }) 
   await page.emulateMedia({ colorScheme: 'dark' });
   await seed(page, { settings: { theme: 'light' } }, '#paints');
   expect(await pageBg(page)).toBe(LIGHT_BG);
-  expect(await barColor(page)).toBe('#f6f4ef');
+  expect(await barColor(page)).toBe('#fbf5ee');
 });

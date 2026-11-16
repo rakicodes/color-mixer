@@ -44,6 +44,10 @@ export async function renderPalette(root: HTMLElement, ctx: AppContext): Promise
   };
 
   root.append(
+    h('header', { class: 'page-head' },
+      h('span', { class: 'eyebrow' }, `${paints.length} ${paints.length === 1 ? 'pan' : 'pans'}`),
+      h('h2', { class: 'page-title' }, 'Your paints', h('span', { class: 'title-count' }, ` (${paints.length})`)),
+    ),
     h('section', { class: 'card' },
       h('h2', {}, 'Add a paint'),
       h('p', { class: 'hint' },
@@ -94,7 +98,12 @@ export async function renderPalette(root: HTMLElement, ctx: AppContext): Promise
         rowError.textContent = '';
       }),
     });
-    const editColor = colorField(paint.hex);
+    const strength = h('div', { class: 'strength', style: { background: strengthRamp(paint.hex) } });
+    const hexLabel = h('span', { class: 'paint-hex hex' }, paint.hex);
+    const editColor = colorField(paint.hex, (hex) => {
+      strength.style.background = strengthRamp(hex);
+      hexLabel.textContent = hex;
+    });
     editColor.el.addEventListener(
       'change',
       withErrors(async () => {
@@ -104,29 +113,36 @@ export async function renderPalette(root: HTMLElement, ctx: AppContext): Promise
     list.append(
       h('li', { class: 'paint-item' },
         editColor.el,
+        strength,
         rename,
-        h('span', { class: 'badge' }, paint.source === 'photo' ? 'photo' : 'manual'),
-        h('button', {
-          class: 'danger icon',
-          'aria-label': `Delete ${current.name}`,
-          title: 'Delete',
-          onclick: withErrors(async () => {
-            if (confirm(`Delete ${current.name}?`)) {
-              await ctx.palette.remove(paint.id);
-              await rerender();
-            }
-          }),
-        }, '✕'),
+        h('div', { class: 'paint-meta' },
+          hexLabel,
+          h('span', { class: 'badge' }, paint.source === 'photo' ? 'photo' : 'manual'),
+        ),
+        h('div', { class: 'paint-corner' },
+          h('button', {
+            class: 'danger icon',
+            'aria-label': `Delete ${current.name}`,
+            title: 'Delete',
+            onclick: withErrors(async () => {
+              if (confirm(`Delete ${current.name}?`)) {
+                await ctx.palette.remove(paint.id);
+                await rerender();
+              }
+            }),
+          }, '✕'),
+        ),
         rowError,
       ),
     );
   }
 
-  root.append(
-    h('section', { class: 'card' },
-      h('h2', {}, `Your paints (${paints.length})`),
-      paints.length ? list : h('p', { class: 'hint' }, 'No paints yet. Add the paints you own above.'),
-      paints.length ? h('button', { class: 'primary', onclick: () => ctx.go('target') }, 'Next: choose a target →') : null,
-    ),
-  );
+  if (paints.length) {
+    root.append(list, h('button', { class: 'primary', onclick: () => ctx.go('target') }, 'Next: choose a target →'));
+  } else {
+    root.append(h('p', { class: 'hint' }, 'No paints yet. Add the paints you own above.'));
+  }
 }
+
+/** Full-strength colour fading to paper, like a wash swatch. */
+const strengthRamp = (hex: string) => `linear-gradient(90deg, ${hex} 0%, ${hex} 25%, color-mix(in srgb, ${hex} 18%, transparent) 100%)`;

@@ -35,15 +35,19 @@ export async function renderTarget(root: HTMLElement, ctx: AppContext): Promise<
   };
 
   root.append(
-    h('section', { class: 'card' },
-      h('h2', {}, 'What color do you want?'),
+    h('header', { class: 'page-head' },
+      h('h2', { class: 'page-title' }, 'What color do you want?'),
+    ),
+    h('section', { class: 'card target-panel' },
+      h('span', { class: 'label' }, 'Target'),
       preview,
+      h('span', { class: 'hint' }, 'Hex code'),
       h('div', { class: 'row' }, field.el, h('button', { onclick: withErrors(fromPhoto) }, 'From photo…')),
       uncalibratedHint,
       h('p', { class: 'hint' },
         'Picking from a photo of a reference (like a painting or a color card) works best with white paper in the shot.'),
-      h('button', { class: 'primary', onclick: withErrors(start) }, session ? 'Start a new mix' : 'Start mixing'),
-      session ? h('button', { onclick: () => ctx.go('mix') }, 'Back to current mix') : null,
     ),
+    h('button', { class: 'primary big', onclick: withErrors(start) }, session ? 'Start a new mix' : 'Start mixing'),
   );
+  if (session) root.append(h('button', { class: 'secondary', onclick: () => ctx.go('mix') }, 'Back to current mix'));
 }

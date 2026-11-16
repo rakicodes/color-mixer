@@ -1,7 +1,14 @@
 import { initErrorReporting, reportError, setErrorContext } from './errors';
 initErrorReporting(); // as early as possible
 
-import './style.css';
+import '@fontsource/bodoni-moda/400.css';
+import '@fontsource/bodoni-moda/500.css';
+import '@fontsource/bodoni-moda/500-italic.css';
+import '@fontsource/jost/400.css';
+import '@fontsource/jost/500.css';
+import '@fontsource/jost/600.css';
+import '@fontsource/jost/600-italic.css';
+import '@fontsource/caveat/400.css';
 import { palette, sessions, settings, type AppContext, type Tab } from './app';
 import { renderMix } from './views/mix';
 import { renderPalette } from './views/palette';
