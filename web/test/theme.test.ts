@@ -21,7 +21,7 @@ function fakeDarkQuery(matches: boolean) {
 async function setup(darkDevice = false, saved?: object) {
   vi.resetModules();
   const mq = fakeDarkQuery(darkDevice);
-  document.head.innerHTML = '<meta name="theme-color" content="#f6f4ef">';
+  document.head.innerHTML = '<meta name="theme-color" content="#fbf5ee">';
   document.body.innerHTML = '<button id="theme-toggle">◐</button>';
   delete document.documentElement.dataset.theme;
   const store = new MemoryStore();
@@ -78,25 +78,25 @@ describe('THM-01: theme toggle', () => {
 describe('THM-03: browser bar color and device changes', () => {
   it('THM-03: sets the browser bar color for the resolved theme', async () => {
     const { button, meta } = await setup(true);
-    expect(meta()).toBe('#15171b'); // System on a dark device
+    expect(meta()).toBe('#241719'); // System on a dark device
     button.click(); // Light
-    expect(meta()).toBe('#f6f4ef');
+    expect(meta()).toBe('#fbf5ee');
     await flush(); // the button stays disabled until the choice is saved
     button.click(); // Dark
-    expect(meta()).toBe('#15171b');
+    expect(meta()).toBe('#241719');
   });
 
   it('THM-03: in System mode, follows the device switching while open', async () => {
     const { mq, meta } = await setup(false);
-    expect(meta()).toBe('#f6f4ef');
+    expect(meta()).toBe('#fbf5ee');
     mq.change(true);
-    expect(meta()).toBe('#15171b');
+    expect(meta()).toBe('#241719');
   });
 
   it('THM-03: an explicit choice ignores device changes', async () => {
     const { mq, meta } = await setup(false, { theme: 'light' });
     mq.change(true);
-    expect(meta()).toBe('#f6f4ef');
+    expect(meta()).toBe('#fbf5ee');
     expect(document.documentElement.dataset.theme).toBe('light');
   });
 });

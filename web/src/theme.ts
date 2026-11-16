@@ -4,7 +4,7 @@ import { withErrors } from './dom';
 const ICONS: Record<Theme, string> = { system: '◐', light: '☀', dark: '☾' };
 const NAMES: Record<Theme, string> = { system: 'System', light: 'Light', dark: 'Dark' };
 /** Browser bar color per resolved theme; matches --bg in style.css. */
-const BAR_COLORS = { light: '#f6f4ef', dark: '#15171b' };
+const BAR_COLORS = { light: '#fbf5ee', dark: '#241719' };
 
 const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
 

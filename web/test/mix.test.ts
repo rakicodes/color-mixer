@@ -1,4 +1,4 @@
-import { formatSuggestion, MIX_MODELS, planFromCurrent, type MixModelId, type Paint } from '@color-mixer/core';
+import { formatSuggestion, MIX_MODELS, planFromCurrent, type MixModelId, type Paint, type Recipe } from '@color-mixer/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../src/picker', () => ({ pickColorFromPhoto: vi.fn() }));
@@ -6,7 +6,7 @@ vi.mock('../src/errors', () => ({ reportError: vi.fn(), setErrorContext: vi.fn()
 
 import { setErrorContext } from '../src/errors';
 import { pickColorFromPhoto } from '../src/picker';
-import { renderMix } from '../src/views/mix';
+import { finalRecipe, renderMix } from '../src/views/mix';
 import { buttonByText, flush, makeCtx, makeRoot, PAINTS, step, text } from './helpers';
 
 const picker = vi.mocked(pickColorFromPhoto);
@@ -27,6 +27,8 @@ const withStep = (s = step('#8fa3e0'), target = '#a98fd0', calibrated = true) =>
   await ctx.sessions.start(target, calibrated);
   await ctx.sessions.addStep(s);
 };
+
+const headings = (root: HTMLElement) => [...root.querySelectorAll('.recipe-heading')].map((el) => el.textContent);
 
 let confirmMock: ReturnType<typeof vi.fn>;
 beforeEach(() => {
@@ -49,7 +51,9 @@ describe('MIX-01: no mix in progress', () => {
 describe('MIX-02: first step', () => {
   it('MIX-02: shows starting help, the target swatch and no history', async () => {
     const { root, swatches } = await setup(started());
-    expect(text(root)).toContain('Mix a starting puddle, then photograph a test stroke.');
+    expect(root.querySelector('.suggestion-main')?.textContent).toMatch(
+      /^Take a picture of your colour, or use .*(Ultramarine|Quinacridone Rose).* to create it\.$/,
+    );
     expect(swatches()).toEqual(['Target']);
     expect(text(root)).not.toContain('History');
     expect(() => buttonByText(root, 'Photograph your mix')).not.toThrow();
@@ -92,25 +96,22 @@ describe('MIX-03: photograph the mix', () => {
 });
 
 describe('MIX-06: difference details', () => {
-  it('MIX-06: adjust shows current and predicted difference', async () => {
-    const s = step('#8fa3e0', { suggestion: { status: 'adjust', currentDeltaE: 12.34, predictedDeltaE: 4.56, water: 'some', notes: [] } });
-    const { root } = await setup(withStep(s));
-    expect(text(root)).toContain('Difference from target: 12.3, about 4.6 after this step. Under 3 is a match.');
+  it('MIX-06: no numeric difference is shown, whatever the status', async () => {
+    for (const status of ['adjust', 'done', 'stuck'] as const) {
+      const s = step('#8fa3e0', { suggestion: { status, currentDeltaE: 12.34, predictedDeltaE: 4.56, water: 'some', notes: [] } });
+      const { root } = await setup(withStep(s));
+      expect(text(root)).not.toMatch(/difference from target|Under 3 is a match|ΔE/i);
+      if (status === 'done') expect(text(root)).toContain('Close enough. This matches your target!');
+    }
   });
 
-  it('MIX-06: done and stuck show only the current difference', async () => {
-    const s = step('#8fa3e0', { suggestion: { status: 'done', currentDeltaE: 2.04, water: 'none', notes: [] } });
-    const { root } = await setup(withStep(s));
-    expect(text(root)).toContain('Difference from target: 2.0. Under 3 is a match.');
-    expect(text(root)).toContain('Close enough. This matches your target!');
-  });
-
-  it('MIX-07: lists the difference notes', async () => {
+  it('MIX-07: does not show the difference notes', async () => {
     const s = step('#8fa3e0', {
       suggestion: { status: 'adjust', currentDeltaE: 9, water: 'none', notes: ['Your mix is lighter than the target.'] },
     });
     const { root } = await setup(withStep(s));
-    expect([...root.querySelectorAll('.notes li')].map((li) => li.textContent)).toEqual(['Your mix is lighter than the target.']);
+    expect(root.querySelector('.notes')).toBeNull();
+    expect(text(root)).not.toContain('Your mix is lighter than the target.');
   });
 });
 
@@ -160,7 +161,7 @@ describe('MIX-11: no paints', () => {
 });
 
 describe('MIX-12: history', () => {
-  it('MIX-12: lists readings newest first with number, sentence, ΔE and model badge', async () => {
+  it('MIX-12: lists readings newest first with number, sentence and model badge', async () => {
     const { root } = await setup(async (ctx) => {
       await ctx.sessions.start('#a98fd0');
       await ctx.sessions.addStep(step('#111111', { suggestion: { status: 'adjust', currentDeltaE: 20, water: 'some', notes: [], modelId: 'oklab' } }));
@@ -169,9 +170,9 @@ describe('MIX-12: history', () => {
     });
     const items = [...root.querySelectorAll('.history li')].map((li) => li.textContent);
     expect(items).toEqual([
-      "#3 Close enough. This matches your target! ΔE 1.0",
-      "#2 Your paints can't get this mix any closer. ΔE 8.3K-M",
-      '#1 Add some water. ΔE 20.0Blend',
+      '#3 Close enough. This matches your target!',
+      "#2 Your paints can't get this mix any closer.K-M",
+      '#1 Add some water.Blend',
     ]);
   });
 });
@@ -269,16 +270,20 @@ describe('REC-03: starting mix before the first photo', () => {
   it('REC-03: suggests a starting mix from your paints, as parts and a wash', async () => {
     const { root, swatches } = await setup(started());
     const main = root.querySelector('.starting-mix-main')?.textContent ?? '';
-    expect(main).toMatch(/^Starting mix: .*(Ultramarine|Quinacridone Rose).*, as a (strong|medium|pale) wash/);
+    expect(main).toMatch(/^Mix .*(Ultramarine|Quinacridone Rose).*, as a (strong|medium|pale) wash/);
+    expect(headings(root)).toEqual(['Ingredients', 'Method']);
     expect(root.querySelector('.starting-mix .chip')).not.toBeNull();
-    expect(text(root)).toMatch(/difference from target: about \d+\.\d|closest your paints get/);
-    // Still the first-step help, and no extra swatch.
-    expect(text(root)).toContain('Mix a starting puddle, then photograph a test stroke.');
+    expect(text(root)).not.toMatch(/difference from target|closest your paints get/i);
+    // Still the first-step intro, and no extra swatch.
+    expect(text(root)).toContain('Take a picture of your colour, or use');
     expect(swatches()).toEqual(['Target']);
   });
 
   it('REC-03: not shown without paints, or once there is a reading', async () => {
-    expect((await setup(started(), false)).root.querySelector('.starting-mix')).toBeNull();
+    const noPaints = (await setup(started(), false)).root;
+    expect(noPaints.querySelector('.starting-mix')).toBeNull();
+    expect(noPaints.querySelector('.suggestion-main')?.textContent).toBe('Take a picture of your colour to get started.');
+    expect(headings(noPaints)).toEqual([]);
     expect((await setup(withStep())).root.querySelector('.starting-mix')).toBeNull();
   });
 });
@@ -323,5 +328,67 @@ describe('REC-01 / REC-02: next step from the recipe', () => {
     const [km] = planFromCurrent(WHITE, VIOLET, await savedPaints(ctx), { model: 'km-spectral' }).steps;
     expect((await ctx.sessions.load())!.steps[0].suggestion).toEqual(km);
     expect(root.querySelector('.suggestion-main')?.textContent).toBe(formatSuggestion(km));
+  });
+});
+
+describe('REC-04: recipe format', () => {
+  it('REC-04: an adjust step lists ingredients to add and a method', async () => {
+    const s = step('#8fa3e0', {
+      suggestion: { status: 'adjust', currentDeltaE: 9, water: 'some', notes: [], paints: [{ id: 'x', name: 'Ultramarine', amount: 'touch', fraction: 0.05 }] },
+    });
+    const { root } = await setup(withStep(s));
+    expect(headings(root)).toEqual(['Ingredients', 'Method']);
+    expect(text(root)).toContain('Add these to your puddle and mix well.');
+  });
+
+  it('REC-04: done and stuck show the final recipe', async () => {
+    for (const status of ['done', 'stuck'] as const) {
+      const { root } = await setup(async (ctx) => {
+        await ctx.sessions.start('#a98fd0');
+        await ctx.sessions.addStep(step('#8fa3e0', { suggestion: { status: 'adjust', currentDeltaE: 9, water: 'some', notes: [] } }));
+        await ctx.sessions.addStep(step('#a98fd0', { suggestion: { status, currentDeltaE: 1, water: 'none', notes: [] } }));
+      });
+      expect(headings(root)).toEqual(['Ingredients', 'Method']);
+      const steps = [...root.querySelectorAll('.method li')].map((li) => li.textContent);
+      expect(steps[0]).toMatch(/^Mix /);
+      expect(steps.at(-1)).toBe('Add some water.');
+    }
+  });
+
+  it('REC-04: finalRecipe adds up the start and every adjustment', () => {
+    const paints: Paint[] = [
+      { id: 'r', name: 'Red', hex: '#d63a3f', source: 'manual' },
+      { id: 'p', name: 'Purple', hex: '#7a4a9e', source: 'manual' },
+    ];
+    const start: Recipe = {
+      start: 'scratch',
+      parts: [
+        { paintId: 'p', name: 'Purple', parts: 3, share: 0.6 },
+        { paintId: 'r', name: 'Red', parts: 2, share: 0.4 },
+      ],
+      waterFraction: 0.5,
+      wash: 'medium',
+      steps: [],
+      predictedHex: '#a05070',
+      predictedDeltaE: 4,
+      outcome: 'stuck',
+      modelId: 'oklab',
+    };
+    const steps = [
+      step('#111111', {
+        suggestion: { status: 'adjust', currentDeltaE: 9, water: 'lot', notes: [], paints: [{ id: 'r', name: 'Red', amount: 'some', fraction: 0.3 }] },
+      }),
+      step('#222222', { suggestion: { status: 'done', currentDeltaE: 1, water: 'none', notes: [] } }),
+    ];
+    const { rows, method } = finalRecipe(steps, start, paints);
+    expect(method).toEqual(['Mix 3 parts Purple and 2 parts Red, as a medium wash.', 'Add some Red and a lot of water.']);
+    expect(rows.map((r) => [r.name, r.amount])).toEqual([
+      ['Purple', '3 parts'],
+      ['Red', '2 parts + some'],
+      ['Water', 'some + a lot'],
+    ]);
+    const red = rows.find((r) => r.name === 'Red')!;
+    expect(red.width).toBe(1);
+    expect(red.hex).toBe('#d63a3f');
   });
 });
