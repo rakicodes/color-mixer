@@ -13,6 +13,8 @@
         if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme;
       } catch (e) {}
     </script>
+    <!-- Linked here (not imported from JS) so it blocks first paint; avoids a flash of unstyled content in dev. -->
+    <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
     <header class="app-header">

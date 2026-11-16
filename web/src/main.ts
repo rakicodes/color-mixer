@@ -1,7 +1,6 @@
 import { initErrorReporting, reportError, setErrorContext } from './errors';
 initErrorReporting(); // as early as possible
 
-import './style.css';
 import { palette, sessions, settings, type AppContext, type Tab } from './app';
 import { renderMix } from './views/mix';
 import { renderPalette } from './views/palette';
