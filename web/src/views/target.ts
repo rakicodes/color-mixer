@@ -1,6 +1,7 @@
 import type { AppContext } from '../app';
 import { colorField, h, withErrors } from '../dom';
 import { pickColorFromPhoto } from '../picker';
+import { trackEvent } from '../analytics';
 
 export async function renderTarget(root: HTMLElement, ctx: AppContext): Promise<void> {
   const session = await ctx.sessions.load();
@@ -26,11 +27,13 @@ export async function renderTarget(root: HTMLElement, ctx: AppContext): Promise<
     if (!picked) return;
     field.set(picked.hex);
     setCalibrated(picked.calibrated);
+    trackEvent('target-from-photo');
   };
 
   const start = async () => {
     if (session?.steps.length && !confirm('Start a new mix? Your current mixing history will be cleared.')) return;
     await ctx.sessions.start(field.value, calibrated);
+    trackEvent('mix-started');
     ctx.go('mix');
   };
 

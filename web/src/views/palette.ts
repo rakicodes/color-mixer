@@ -2,6 +2,7 @@ import { DuplicatePaintError, type Paint } from '@color-mixer/core';
 import type { AppContext } from '../app';
 import { colorField, h, withErrors } from '../dom';
 import { pickColorFromPhoto } from '../picker';
+import { trackEvent } from '../analytics';
 
 export async function renderPalette(root: HTMLElement, ctx: AppContext): Promise<void> {
   const paints = await ctx.palette.list();
@@ -21,6 +22,7 @@ export async function renderPalette(root: HTMLElement, ctx: AppContext): Promise
     if (!picked) return;
     color.set(picked.hex);
     source = 'photo';
+    trackEvent('paint-from-photo');
     addError.textContent = picked.calibrated ? '' : 'Tip: include white paper in the photo for more accurate color.';
     name.focus();
   };
@@ -40,6 +42,7 @@ export async function renderPalette(root: HTMLElement, ctx: AppContext): Promise
       name.focus();
       return;
     }
+    trackEvent('paint-added');
     await rerender();
   };
 

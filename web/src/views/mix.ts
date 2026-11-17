@@ -20,6 +20,7 @@ import type { AppContext } from '../app';
 import { h, swatch, withErrors } from '../dom';
 import { setErrorContext } from '../errors';
 import { pickColorFromPhoto } from '../picker';
+import { trackEvent } from '../analytics';
 
 export async function renderMix(root: HTMLElement, ctx: AppContext): Promise<void> {
   const [session, paints, settings] = await Promise.all([ctx.sessions.load(), ctx.palette.list(), ctx.settings.load()]);
@@ -55,6 +56,7 @@ export async function renderMix(root: HTMLElement, ctx: AppContext): Promise<voi
     if (!picked) return;
     const { suggestion } = nextStepFromRecipe(picked.hex, session.targetHex, paints, { model: settings.mixModel });
     await ctx.sessions.addStep({ measuredHex: picked.hex, calibrated: picked.calibrated, suggestion, ts: Date.now() });
+    trackEvent('mix-checked');
     root.replaceChildren();
     await renderMix(root, ctx);
   };
@@ -69,6 +71,7 @@ export async function renderMix(root: HTMLElement, ctx: AppContext): Promise<voi
   const onModelChange = async (id: MixModelId) => {
     await ctx.settings.update({ mixModel: id });
     setErrorContext('mixModel', id);
+    trackEvent(`model-${id}`);
     if (last) {
       const { suggestion } = nextStepFromRecipe(last.measuredHex, session.targetHex, paints, { model: id });
       await ctx.sessions.replaceLastStep({ ...last, suggestion });
@@ -116,6 +119,7 @@ export async function renderMix(root: HTMLElement, ctx: AppContext): Promise<voi
         onclick: withErrors(async () => {
           if (!confirm('Clear this mix and its history?')) return;
           await ctx.sessions.clear();
+          trackEvent('mix-cleared');
           ctx.go('target');
         }),
       }, 'End mix'),

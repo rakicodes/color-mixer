@@ -1,5 +1,7 @@
 import { initErrorReporting, reportError, setErrorContext } from './errors';
 initErrorReporting(); // as early as possible
+import { initAnalytics, trackView } from './analytics';
+initAnalytics();
 
 import '@fontsource/bodoni-moda/400.css';
 import '@fontsource/bodoni-moda/500.css';
@@ -42,6 +44,7 @@ async function render() {
   // Build into a detached container and only show it if no newer render has
   // started meanwhile. Matters once storage is truly async (e.g. a phone app).
   setErrorContext('tab', current);
+  trackView(current);
   const container = document.createElement('div');
   container.className = 'view-content';
   try {

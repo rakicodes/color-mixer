@@ -44,6 +44,15 @@ Errors are reported to Sentry (project `rakicodes/color-mixer`), set up in `web/
 - **Readable stack traces:** in CI, when the `SENTRY_AUTH_TOKEN` GitHub secret is set, `sentry-cli` injects debug IDs into the built files and uploads their source maps. The maps are then deleted from the published site.
 - **Turning it off:** set `VITE_SENTRY_DSN=` (empty) in `web/.env`.
 
+## Usage analytics
+
+Anonymous usage counts go to [GoatCounter](https://www.goatcounter.com), set up in `web/src/analytics.ts`. GoatCounter uses no cookies, so no consent banner is needed.
+
+- **Sent:** the tab name on each tab view (`paints`, `target`, `mix`) and a few action names: `paint-added`, `paint-from-photo`, `target-from-photo`, `mix-started`, `mix-checked`, `mix-cleared`, `model-<id>`. GoatCounter also records the referrer, browser, screen size and country of each visit.
+- **Never sent:** colors, paint names, photos, or user info.
+- **Only counted:** in production builds, and not on localhost.
+- **Turning it on or off:** set `VITE_GOATCOUNTER_URL=https://<code>.goatcounter.com/count` in `web/.env`, or leave it empty to turn analytics off.
+
 ## Scripts
 
 ```sh
